@@ -1,43 +1,61 @@
-name: CI
+name: Build Kivy Android APK
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch: {}
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # -----------------------------
+      # CHECKOUT CODE
+      # -----------------------------
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # -----------------------------
+      # PYTHON
+      # -----------------------------
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      - name: Install Java
+      # -----------------------------
+      # JAVA (REQUIRED)
+      # -----------------------------
+      - name: Set up Java
         uses: actions/setup-java@v3
         with:
-          distribution: temurin
+          distribution: "temurin"
           java-version: "17"
 
+      # -----------------------------
+      # ANDROID SDK
+      # -----------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install SDK & NDK
+      - name: Install Android SDK & NDK
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-33"
           sdkmanager "build-tools;34.0.0"
           sdkmanager "ndk;25.2.9519653"
 
+      # 🔴 THIS FIXES: "Aidl not found"
       - name: Add build-tools to PATH
-        run: echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+        run: |
+          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
 
-      - name: Install system deps
+      # -----------------------------
+      # SYSTEM DEPENDENCIES
+      # -----------------------------
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -45,22 +63,44 @@ jobs:
             git \
             zip \
             unzip \
-            openjdk-17-jdk \
-            ffmpeg
+            ffmpeg \
+            openjdk-17-jdk
 
+      # -----------------------------
+      # PYTHON TOOLS
+      # -----------------------------
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install cython buildozer
 
-      - name: Accept licenses
-        run: yes | sdkmanager --licenses || true
+      # -----------------------------
+      # ACCEPT LICENSES
+      # -----------------------------
+      - name: Accept Android licenses
+        run: |
+          yes | sdkmanager --licenses || true
 
-      - name: Build APK
-        run: buildozer android debug
+      # -----------------------------
+      # VERIFY AIDL (DEBUG SAFE)
+      # -----------------------------
+      - name: Verify aidl
+        run: |
+          which aidl
+          aidl --version
 
-      - name: Upload APK
+      # -----------------------------
+      # BUILD APK
+      # -----------------------------
+      - name: Build APK with Buildozer
+        run: |
+          buildozer -v android debug
+
+      # -----------------------------
+      # UPLOAD APK
+      # -----------------------------
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: apk
+          name: kivy-apk
           path: bin/*.apk
