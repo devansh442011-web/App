@@ -12,32 +12,55 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      # 1️⃣ Install Java 17 (required by Android tools)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # 2️⃣ Install system dependencies
+      - name: Install system deps
         run: |
           sudo apt update
-          sudo apt install -y \
-            openjdk-17-jdk \
-            unzip \
-            zip \
-            libncurses5 \
-            libstdc++6 \
-            zlib1g
+          sudo apt install -y unzip zip libncurses5
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android build tools (AIDL)
+      # 3️⃣ Install Android SDK manually (MOST RELIABLE)
+      - name: Install Android SDK
         run: |
-          sdkmanager "platform-tools" \
-                     "platforms;android-33" \
-                     "build-tools;33.0.2"
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk/cmdline-tools
 
-      - name: Build APK with Buildozer
+          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip commandlinetools-linux-*.zip
+          mv cmdline-tools latest
+
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+
+      # 4️⃣ Install SDK components (THIS INSTALLS AIDL)
+      - name: Install SDK packages
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-33" \
+            "build-tools;33.0.2"
+
+      # 5️⃣ Verify aidl exists (IMPORTANT)
+      - name: Verify aidl
+        run: |
+          find $ANDROID_HOME -name aidl
+          aidl version
+
+      # 6️⃣ Build APK
+      - name: Build APK
         uses: digreatbrian/buildozer-action@v2
         with:
           python-version: 3.11
           buildozer-cmd: buildozer -v android debug
 
+      # 7️⃣ Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
