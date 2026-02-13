@@ -11,50 +11,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -----------------------------
-      # CHECKOUT CODE
-      # -----------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # PYTHON
-      # -----------------------------
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      # -----------------------------
-      # JAVA (REQUIRED)
-      # -----------------------------
       - name: Set up Java
         uses: actions/setup-java@v3
         with:
           distribution: "temurin"
           java-version: "17"
 
-      # -----------------------------
-      # ANDROID SDK
-      # -----------------------------
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK & NDK
+      # ✅ USE BUILD-TOOLS 33.0.2 (CRITICAL)
+      - name: Install Android SDK components
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-33"
-          sdkmanager "build-tools;34.0.0"
+          sdkmanager "build-tools;33.0.2"
           sdkmanager "ndk;25.2.9519653"
 
-      # 🔴 THIS FIXES: "Aidl not found"
+      # ✅ Add correct aidl to PATH
       - name: Add build-tools to PATH
         run: |
-          echo "$ANDROID_HOME/build-tools/34.0.0" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
 
-      # -----------------------------
-      # SYSTEM DEPENDENCIES
-      # -----------------------------
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -66,40 +52,26 @@ jobs:
             ffmpeg \
             openjdk-17-jdk
 
-      # -----------------------------
-      # PYTHON TOOLS
-      # -----------------------------
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install cython buildozer
 
-      # -----------------------------
-      # ACCEPT LICENSES
-      # -----------------------------
       - name: Accept Android licenses
         run: |
           yes | sdkmanager --licenses || true
 
-      # -----------------------------
-      # VERIFY AIDL (DEBUG SAFE)
-      # -----------------------------
+      # ✅ OPTIONAL sanity check
       - name: Verify aidl
         run: |
-          which aidl
-          aidl --version
+          aidl --help
 
-      # -----------------------------
-      # BUILD APK
-      # -----------------------------
-      - name: Build APK with Buildozer
+      # ✅ BUILD
+      - name: Build APK
         run: |
           buildozer -v android debug
 
-      # -----------------------------
-      # UPLOAD APK
-      # -----------------------------
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: kivy-apk
