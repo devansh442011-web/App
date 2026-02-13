@@ -65,12 +65,17 @@ jobs:
       - name: Verify aidl
         run: |
           aidl --help
-      - name: Disable parallel downloads (fix urllib error)
+      - name: Disable parallel downloads
         run: |
           echo "P4A_NO_PARALLEL_DOWNLOADS=1" >> $GITHUB_ENV
 
-      - name: Clean broken downloads
+      - name: Force curl downloads
         run: |
+          echo "P4A_DOWNLOAD_WITH_CURL=1" >> $GITHUB_ENV
+
+      - name: Clean buildozer state
+        run: |
+          buildozer android clean || true
           rm -rf ~/.buildozer
           rm -rf .buildozer
 
