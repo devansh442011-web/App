@@ -27,7 +27,12 @@ jobs:
         java-version: '17'
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
+      uses: android-actions/setup-android@v3
+      
+    - name: Install Android SDK components
+      run: |
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+        sdkmanager "ndk;25.2.9519653"
 
     - name: Install buildozer
       run: |
@@ -67,7 +72,11 @@ jobs:
         key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
 
     - name: Build APK with buildozer
+      env:
+        ANDROID_HOME: ${{ env.ANDROID_HOME }}
+        ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
       run: |
+        yes | sdkmanager --licenses || true
         buildozer android debug
 
     - name: Upload APK artifact
