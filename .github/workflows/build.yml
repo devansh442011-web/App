@@ -1,80 +1,85 @@
-name: 'Kivy App to APK'
-description: 'Convert Kivy app to APK'
+name: "Kivy App to APK"
+description: "Convert Kivy app to Android APK using Buildozer"
+
 inputs:
   python-version:
-    description: 'Python version to use'
-    default: '3.8'
-  work-dir:
-    default: '.'
-    description: 'Working directory'
+    default: "3.9"
+    description: "Python version"
   buildozer-cmd:
-    default: 'buildozer android debug'
-    description: 'Buildozer command to use'
+    default: "buildozer android debug"
+    description: "Buildozer command"
 
-# Add the branding section
 branding:
-  color: 'green'
-  icon: 'play'
+  color: "green"
+  icon: "play"
 
 runs:
   using: "composite"
   steps:
-    - name: Setup python
+    # ---------------- PYTHON ----------------
+    - name: Setup Python
       uses: actions/setup-python@v5
       with:
-        architecture: x64
         python-version: ${{ inputs.python-version }}
 
-    - name: Setup Java 17 required by Gradle
+    # ---------------- JAVA ----------------
+    - name: Setup Java 17
       uses: actions/setup-java@v4
       with:
-        distribution: 'temurin'  # or 'zulu','liberica', etc.
-        java-version: '17'
+        distribution: "temurin"
+        java-version: "17"
 
-    - name: Set JAVA_HOME
-      run: |
-        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
-      shell: bash
+    # ---------------- ANDROID SDK ----------------
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
 
-    - name: Prepare virtual environment
-      run: |
-        python3 -m venv venv
-        source venv/bin/activate
-        echo "Using Python==$(python --version)"
+    - name: Install Android SDK components
       shell: bash
-      
-    - name: Install and upgrade dependencies
+      run: |
+        sdkmanager "platform-tools"
+        sdkmanager "platforms;android-33"
+        sdkmanager "build-tools;33.0.2"
+        sdkmanager "ndk;25.2.9519653"
+
+    - name: Add build-tools to PATH (fix aidl)
+      shell: bash
+      run: |
+        echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
+
+    # ---------------- SYSTEM DEPS ----------------
+    - name: Install system dependencies
+      shell: bash
       run: |
         sudo apt update
-        sudo apt install -y git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          python3-pip \
-          autoconf \
-          libtool \
-          pkg-config \
-          zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
-          cmake \
-          libffi-dev \
-          libssl-dev
-        export PATH=$PATH:~/.local/bin/
-        python3 -m pip install --upgrade \
-          Cython==0.29.33 \
-          buildozer
-      shell: bash
+        sudo apt install -y \
+          git zip unzip \
+          build-essential \
+          autoconf libtool pkg-config \
+          zlib1g-dev libncurses5-dev \
+          libffi-dev libssl-dev \
+          cmake
 
-    - name: Install requirements in requirements.txt if it exists
+    # ---------------- PYTHON DEPS ----------------
+    - name: Install Buildozer
+      shell: bash
       run: |
-        if [ -f requirements.txt ]; then
-          python3 -m pip install -r requirements.txt
-        fi
-      shell: bash
+        python -m pip install --upgrade pip
+        pip install "Cython==0.29.33" buildozer
 
-    - name: Build with Buildozer
+    # ---------------- STABILITY FIXES ----------------
+    - name: Fix python-for-android download crashes
+      shell: bash
+      run: |
+        echo "P4A_NO_PARALLEL_DOWNLOADS=1" >> $GITHUB_ENV
+        echo "P4A_DOWNLOAD_WITH_CURL=1" >> $GITHUB_ENV
+
+    - name: Accept Android licenses
+      shell: bash
+      run: |
+        yes | sdkmanager --licenses || true
+
+    # ---------------- BUILD ----------------
+    - name: Build APK with Buildozer
+      shell: bash
       run: |
         ${{ inputs.buildozer-cmd }}
-      shell: bash
