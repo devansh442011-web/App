@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -11,11 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Get current date (for cache key)
       - name: Get Date
         id: get-date
         run: echo "date=$(date -u +'%Y%m%d')" >> $GITHUB_OUTPUT
@@ -24,7 +21,7 @@ jobs:
       - name: Cache Buildozer Global
         uses: actions/cache@v3
         with:
-          path: .buildozer_global
+          path: ~/.buildozer
           key: buildozer-global-${{ hashFiles('buildozer.spec') }}
 
       # Cache local .buildozer directory
@@ -34,15 +31,14 @@ jobs:
           path: .buildozer
           key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
 
-      # Build APK using Buildozer Action
+      # Use the official Kivy Buildozer Action
       - name: Build with Buildozer
+        uses: kivy/buildozer-action@v1
         id: buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
         with:
           command: buildozer android debug
           buildozer_version: stable
 
-      # Upload APK artifact
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
