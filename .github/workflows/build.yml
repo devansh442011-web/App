@@ -71,13 +71,29 @@ jobs:
         path: .buildozer
         key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec') }}
 
-    - name: Build APK with buildozer
-      env:
-        ANDROID_HOME: ${{ env.ANDROID_HOME }}
-        ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+    - name: Setup buildozer environment
       run: |
+        # Accept all SDK licenses
         yes | sdkmanager --licenses || true
-        buildozer android debug
+        
+        # Verify aidl exists
+        find $ANDROID_HOME -name "aidl" -type f
+        
+        # Set up environment for buildozer
+        export ANDROIDSDK="$ANDROID_HOME"
+        export ANDROIDNDK="$ANDROID_HOME/ndk/25.2.9519653"
+        export ANDROIDAPI="33"
+        export ANDROIDMINAPI="21"
+        
+        echo "ANDROIDSDK=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "ANDROIDNDK=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+        echo "ANDROIDAPI=33" >> $GITHUB_ENV
+        echo "ANDROIDMINAPI=21" >> $GITHUB_ENV
+    
+    - name: Build APK with buildozer
+      run: |
+        # Use p4a to build with specific SDK
+        buildozer -v android debug
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
