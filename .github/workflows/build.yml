@@ -1,91 +1,80 @@
-name: Build Kivy Android APK
+name: 'Kivy App to APK'
+description: 'Convert Kivy app to APK'
+inputs:
+  python-version:
+    description: 'Python version to use'
+    default: '3.8'
+  work-dir:
+    default: '.'
+    description: 'Working directory'
+  buildozer-cmd:
+    default: 'buildozer android debug'
+    description: 'Buildozer command to use'
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch: {}
+# Add the branding section
+branding:
+  color: 'green'
+  icon: 'play'
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+runs:
+  using: "composite"
+  steps:
+    - name: Setup python
+      uses: actions/setup-python@v5
+      with:
+        architecture: x64
+        python-version: ${{ inputs.python-version }}
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Setup Java 17 required by Gradle
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'  # or 'zulu','liberica', etc.
+        java-version: '17'
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.9"
+    - name: Set JAVA_HOME
+      run: |
+        echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+      shell: bash
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: "temurin"
-          java-version: "17"
+    - name: Prepare virtual environment
+      run: |
+        python3 -m venv venv
+        source venv/bin/activate
+        echo "Using Python==$(python --version)"
+      shell: bash
+      
+    - name: Install and upgrade dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          python3-pip \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev
+        export PATH=$PATH:~/.local/bin/
+        python3 -m pip install --upgrade \
+          Cython==0.29.33 \
+          buildozer
+      shell: bash
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+    - name: Install requirements in requirements.txt if it exists
+      run: |
+        if [ -f requirements.txt ]; then
+          python3 -m pip install -r requirements.txt
+        fi
+      shell: bash
 
-      # ✅ USE BUILD-TOOLS 33.0.2 (CRITICAL)
-      - name: Install Android SDK components
-        run: |
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-33"
-          sdkmanager "build-tools;33.0.2"
-          sdkmanager "ndk;25.2.9519653"
-
-      # ✅ Add correct aidl to PATH
-      - name: Add build-tools to PATH
-        run: |
-          echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            git \
-            zip \
-            unzip \
-            ffmpeg \
-            openjdk-17-jdk
-
-      - name: Install Buildozer
-        run: |
-          pip install --upgrade pip
-          pip install cython buildozer
-
-      - name: Accept Android licenses
-        run: |
-          yes | sdkmanager --licenses || true
-
-      # ✅ OPTIONAL sanity check
-      - name: Verify aidl
-        run: |
-          aidl --help
-      - name: Disable parallel downloads
-        run: |
-          echo "P4A_NO_PARALLEL_DOWNLOADS=1" >> $GITHUB_ENV
-
-      - name: Force curl downloads
-        run: |
-          echo "P4A_DOWNLOAD_WITH_CURL=1" >> $GITHUB_ENV
-
-      - name: Clean buildozer state
-        run: |
-          buildozer android clean || true
-          rm -rf ~/.buildozer
-          rm -rf .buildozer
-
-      # ✅ BUILD
-      - name: Build APK
-        run: |
-          buildozer -v android debug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: kivy-apk
-          path: bin/*.apk
+    - name: Build with Buildozer
+      run: |
+        ${{ inputs.buildozer-cmd }}
+      shell: bash
