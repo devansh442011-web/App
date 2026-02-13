@@ -99,7 +99,8 @@ android.permissions = CAMERA,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
 android.api = 33
 android.minapi =21
-android.ndk = 25b
+android.ndk = 25.2.9519653
+android.accept_sdk_license = True
 android.build_tools_version = 33.0.2
 
 # (list) features (adds uses-feature -tags to manifest)
