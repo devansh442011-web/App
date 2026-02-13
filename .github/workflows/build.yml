@@ -1,85 +1,22 @@
-name: "Kivy App to APK"
-description: "Convert Kivy app to Android APK using Buildozer"
 
-inputs:
-  python-version:
-    default: "3.9"
-    description: "Python version"
-  buildozer-cmd:
-    default: "buildozer android debug"
-    description: "Buildozer command"
+on:
+  push:
+    branches: [ main ]
 
-branding:
-  color: "green"
-  icon: "play"
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
 
-runs:
-  using: "composite"
-  steps:
-    # ---------------- PYTHON ----------------
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ inputs.python-version }}
+      - name: Build APK
+        uses: digreatbrian/buildozer-action@v2
+        with:
+          python-version: 3.11
+          buildozer-cmd: buildozer -v android debug
 
-    # ---------------- JAVA ----------------
-    - name: Setup Java 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: "temurin"
-        java-version: "17"
-
-    # ---------------- ANDROID SDK ----------------
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-
-    - name: Install Android SDK components
-      shell: bash
-      run: |
-        sdkmanager "platform-tools"
-        sdkmanager "platforms;android-33"
-        sdkmanager "build-tools;33.0.2"
-        sdkmanager "ndk;25.2.9519653"
-
-    - name: Add build-tools to PATH (fix aidl)
-      shell: bash
-      run: |
-        echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
-
-    # ---------------- SYSTEM DEPS ----------------
-    - name: Install system dependencies
-      shell: bash
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          git zip unzip \
-          build-essential \
-          autoconf libtool pkg-config \
-          zlib1g-dev libncurses5-dev \
-          libffi-dev libssl-dev \
-          cmake
-
-    # ---------------- PYTHON DEPS ----------------
-    - name: Install Buildozer
-      shell: bash
-      run: |
-        python -m pip install --upgrade pip
-        pip install "Cython==0.29.33" buildozer
-
-    # ---------------- STABILITY FIXES ----------------
-    - name: Fix python-for-android download crashes
-      shell: bash
-      run: |
-        echo "P4A_NO_PARALLEL_DOWNLOADS=1" >> $GITHUB_ENV
-        echo "P4A_DOWNLOAD_WITH_CURL=1" >> $GITHUB_ENV
-
-    - name: Accept Android licenses
-      shell: bash
-      run: |
-        yes | sdkmanager --licenses || true
-
-    # ---------------- BUILD ----------------
-    - name: Build APK with Buildozer
-      shell: bash
-      run: |
-        ${{ inputs.buildozer-cmd }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: ./bin/*.apk
