@@ -10,37 +10,47 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout your code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Set up Python (Required for Buildozer dependencies)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 3. Get current date for cache refreshing
       - name: Get Date
         id: get-date
         run: echo "date=$(date -u +'%Y%m%d')" >> $GITHUB_OUTPUT
 
-      # Cache global buildozer directory
+      # 4. Cache Buildozer Global Data (Android SDK/NDK)
       - name: Cache Buildozer Global
         uses: actions/cache@v3
         with:
           path: ~/.buildozer
-          key: buildozer-global-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-global-${{ hashFiles('buildozer.spec') }}-${{ steps.get-date.outputs.date }}
 
-      # Cache local .buildozer directory
-      - name: Cache Buildozer
+      # 5. Cache Local Project Build Data
+      - name: Cache Buildozer Local
         uses: actions/cache@v3
         with:
           path: .buildozer
-          key: ${{ runner.os }}-${{ steps.get-date.outputs.date }}-${{ hashFiles('buildozer.spec') }}
+          key: ${{ runner.os }}-buildozer-local-${{ hashFiles('buildozer.spec') }}-${{ steps.get-date.outputs.date }}
 
-      # Use the official Kivy Buildozer Action
+      # 6. The Build Step (Using the corrected action name)
       - name: Build with Buildozer
-        uses: kivy/buildozer-action@v1
+        uses: GearSnd/buildozer-action@v1
         id: buildozer
         with:
           command: buildozer android debug
           buildozer_version: stable
 
+      # 7. Upload the resulting APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: APK
+          # The GearSnd action outputs the filename automatically
           path: ${{ steps.buildozer.outputs.filename }}
