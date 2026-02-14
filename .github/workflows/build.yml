@@ -76,6 +76,9 @@ jobs:
       # ----------------------------
       # 6. Verify aidl (IMPORTANT)
       # ----------------------------
+      - name: Add build-tools to PATH
+        run: |
+              echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
       - name: Verify AIDL
         run: |
           find $ANDROID_HOME -name aidl
