@@ -1,109 +1,121 @@
-name: Build Kivy APK
+name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-
+    
     steps:
-      # ----------------------------
-      # 1. Checkout code
-      # ----------------------------
+      # Step 1: Checkout repository code
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # ----------------------------
-      # 2. Install Java 17 (REQUIRED)
-      # ----------------------------
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      # Step 2: Set up Python 3.9
+      - name: Set up Python
+        uses: actions/setup-python@v4
         with:
-          distribution: temurin
-          java-version: 17
+          python-version: '3.9'
 
-      # ----------------------------
-      # 3. Install Linux dependencies
-      # ----------------------------
+      # Step 3: Install system dependencies required for Kivy and Buildozer
       - name: Install system dependencies
         run: |
-          sudo apt update
-          sudo apt install -y \
-            python3-pip \
-            python3-setuptools \
-            python3-wheel \
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
             git \
-            unzip \
+            ffmpeg \
+            libsdl2-dev \
+            libsdl2-image-dev \
+            libsdl2-mixer-dev \
+            libsdl2-ttf-dev \
+            libportmidi-dev \
+            libswscale-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            zlib1g-dev \
+            libgstreamer1.0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            libgstreamer1.0-dev \
             zip \
+            unzip \
             openjdk-17-jdk \
-            libffi-dev \
-            libssl-dev \
-            liblzma-dev \
-            libncurses5 \
-            libstdc++6 \
-            zlib1g
+            autoconf \
+            libtool \
+            pkg-config \
+            libncurses5:i386 \
+            libc6:i386 \
+            libstdc++6:i386 \
+            lib32z1 \
+            libbz2-1.0:i386
 
-      # ----------------------------
-      # 4. Install Android SDK (MANUAL, SAFE)
-      # ----------------------------
-      - name: Install Android SDK
+      # Step 4: Set JAVA_HOME environment variable for Java 17
+      - name: Set JAVA_HOME
         run: |
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+          echo "/usr/lib/jvm/java-17-openjdk-amd64/bin" >> $GITHUB_PATH
+
+      # Step 5: Verify Java installation
+      - name: Verify Java installation
+        run: |
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+
+      # Step 6: Download Android SDK command-line tools
+      - name: Download Android SDK command-line tools
+        run: |
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
           mkdir -p $HOME/android-sdk/cmdline-tools
-          cd $HOME/android-sdk/cmdline-tools
+          unzip -q /tmp/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
 
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-          unzip commandlinetools-linux-*.zip
-          mv cmdline-tools latest
-
+      # Step 7: Set Android SDK environment variables
+      - name: Set Android SDK environment variables
+        run: |
           echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
-          echo "PATH=$HOME/android-sdk/cmdline-tools/latest/bin:$HOME/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/build-tools/33.0.2" >> $GITHUB_PATH
 
-      # ----------------------------
-      # 5. Install SDK packages (AIDL INCLUDED)
-      # ----------------------------
-      - name: Install Android SDK packages
+      # Step 8: Accept Android SDK licenses automatically
+      - name: Accept Android SDK licenses
         run: |
-          yes | sdkmanager --licenses
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;33.0.2"
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      # ----------------------------
-      # 6. Verify aidl (IMPORTANT)
-      # ----------------------------
-      - name: Add build-tools to PATH
+      # Step 9: Install Android SDK components (platform-tools, platform 33, build-tools 33.0.2)
+      - name: Install Android SDK components
         run: |
-              echo "$ANDROID_HOME/build-tools/33.0.2" >> $GITHUB_PATH
-      - name: Verify AIDL
-        run: |
-          find $ANDROID_HOME -name aidl
-          aidl version
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
-      # ----------------------------
-      # 7. Install Buildozer
-      # ----------------------------
-      - name: Install Buildozer
+      # Step 10: Install Buildozer and Cython via pip
+      - name: Install Buildozer and Cython
         run: |
-          pip3 install --upgrade pip
-          pip3 install buildozer cython
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.33
 
-      # ----------------------------
-      # 8. Build APK
-      # ----------------------------
-      - name: Build APK
+      # Step 11: Verify aidl is in PATH and accessible
+      - name: Verify aidl is accessible
         run: |
+          export PATH=$HOME/android-sdk/build-tools/33.0.2:$PATH
+          which aidl
+          aidl --version
+
+      # Step 12: Build Android APK using Buildozer (debug mode)
+      - name: Build APK with Buildozer
+        run: |
+          export PATH=$HOME/android-sdk/build-tools/33.0.2:$PATH
           buildozer -v android debug
 
-      # ----------------------------
-      # 9. Upload APK
-      # ----------------------------
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      # Step 13: Upload generated APK as artifact
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: kivy-apk
+          name: android-apk
           path: bin/*.apk
