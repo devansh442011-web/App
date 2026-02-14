@@ -1,4 +1,4 @@
-name : jai swaimi
+name: Build Android APK
 
 on:
   push:
@@ -22,10 +22,15 @@ jobs:
         with:
           python-version: '3.9'
 
-      # Step 3: Install system dependencies required for Kivy and Buildozer
+      # Step 3: Enable i386 architecture for 32-bit dependencies
+      - name: Enable i386 architecture
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+
+      # Step 4: Install system dependencies required for Kivy and Buildozer
       - name: Install system dependencies
         run: |
-          sudo apt-get update
           sudo apt-get install -y \
             build-essential \
             git \
@@ -35,6 +40,90 @@ jobs:
             libsdl2-mixer-dev \
             libsdl2-ttf-dev \
             libportmidi-dev \
+            libswscale-dev \
+            libavformat-dev \
+            libavcodec-dev \
+            zlib1g-dev \
+            libgstreamer1.0 \
+            gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good \
+            libgstreamer1.0-dev \
+            zip \
+            unzip \
+            openjdk-17-jdk \
+            autoconf \
+            libtool \
+            pkg-config \
+            libncurses5:i386 \
+            libc6:i386 \
+            libstdc++6:i386 \
+            lib32z1 \
+            libbz2-dev
+
+      # Step 5: Set JAVA_HOME environment variable for Java 17
+      - name: Set JAVA_HOME
+        run: |
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+          echo "/usr/lib/jvm/java-17-openjdk-amd64/bin" >> $GITHUB_PATH
+
+      # Step 6: Verify Java installation
+      - name: Verify Java installation
+        run: |
+          java -version
+          echo "JAVA_HOME: $JAVA_HOME"
+
+      # Step 7: Download Android SDK command-line tools
+      - name: Download Android SDK command-line tools
+        run: |
+          wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdline-tools.zip
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          unzip -q /tmp/cmdline-tools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+
+      # Step 8: Set Android SDK environment variables
+      - name: Set Android SDK environment variables
+        run: |
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "$HOME/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/platform-tools" >> $GITHUB_PATH
+          echo "$HOME/android-sdk/build-tools/33.0.2" >> $GITHUB_PATH
+
+      # Step 9: Accept Android SDK licenses automatically
+      - name: Accept Android SDK licenses
+        run: |
+          yes | $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # Step 10: Install Android SDK components (platform-tools, platform 33, build-tools 33.0.2)
+      - name: Install Android SDK components
+        run: |
+          $HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
+      # Step 11: Install Buildozer and Cython via pip
+      - name: Install Buildozer and Cython
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.33
+
+      # Step 12: Verify aidl is in PATH and accessible
+      - name: Verify aidl is accessible
+        run: |
+          export PATH=$HOME/android-sdk/build-tools/33.0.2:$PATH
+          which aidl
+          aidl --version
+
+      # Step 13: Build Android APK using Buildozer (debug mode)
+      - name: Build APK with Buildozer
+        run: |
+          export PATH=$HOME/android-sdk/build-tools/33.0.2:$PATH
+          buildozer -v android debug
+
+      # Step 14: Upload generated APK as artifact
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: bin/*.apk            libportmidi-dev \
             libswscale-dev \
             libavformat-dev \
             libavcodec-dev \
